@@ -1,0 +1,100 @@
+from flask import Flask, render_template_string, request, redirect, url_for, flash, jsonify
+
+app = Flask(__name__)
+app.secret_key = "your_secret_key"
+
+bookings = []
+MAX_SEATS = 7
+
+HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>7-Seater Cab Booking</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  .error { color: red; }
+  .success { color: green; }
+  form { max-width: 400px; margin-bottom: 20px; }
+  input, button { width: 100%; padding: 10px; margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #ddd; padding: 8px; }
+  th { background-color: #f2f2f2; }
+</style>
+</head>
+<body>
+<h1>7-Seater Cab Booking</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <p class="{{ category }}">{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<form method="POST">
+  <input type="text" name="employee_id" placeholder="Employee ID" required />
+  <input type="text" name="name" placeholder="Full Name" required />
+  <input type="text" name="whatsapp_number" placeholder="WhatsApp Number (optional)" />
+  <button type="submit">Book My Seat</button>
+</form>
+
+<h2>Current Bookings ({{ bookings|length }} / {{ max_seats }})</h2>
+<table>
+  <thead>
+    <tr><th>Seat No.</th><th>Employee ID</th><th>Name</th></tr>
+  </thead>
+  <tbody>
+  {% for b in bookings %}
+    <tr>
+      <td>{{ b.seat_number }}</td>
+      <td>{{ b.employee_id }}</td>
+      <td>{{ b.name }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</body>
+</html>
+"""
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        employee_id = request.form.get("employee_id")
+        name = request.form.get("name")
+        whatsapp_number = request.form.get("whatsapp_number", None)
+
+        if any(b["employee_id"] == employee_id for b in bookings):
+            flash("You have already booked a seat.", "error")
+            return redirect(url_for("index"))
+
+        if len(bookings) >= MAX_SEATS:
+            flash("All seats are booked. Please try later.", "error")
+            return redirect(url_for("index"))
+
+        seat_number = len(bookings) + 1
+        bookings.append({
+            "employee_id": employee_id,
+            "name": name,
+            "seat_number": seat_number,
+            "whatsapp_number": whatsapp_number,
+        })
+
+        confirmation = f"Hi {name}, your seat number {seat_number} in the 7-seater cab is confirmed."
+        print(f"Send WhatsApp message to {whatsapp_number if whatsapp_number else 'N/A'}: {confirmation}")
+
+        flash(f"Booking confirmed! Your seat number is {seat_number}.", "success")
+        return redirect(url_for("index"))
+
+    return render_template_string(HTML, bookings=bookings, max_seats=MAX_SEATS)
+
+@app.route("/status")
+def status():
+    return jsonify(bookings)
+
+if __name__ == "__main__":
+    app.run(debug=True)
